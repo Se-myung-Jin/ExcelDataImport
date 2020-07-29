@@ -5,11 +5,16 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO;
+using ImportLib;
+using System.Collections.Concurrent;
 
 namespace ExcelDataImport
 {
     class Program
     {
+        public static ConcurrentQueue<ExcelImportBase> excelSheetQ = new ConcurrentQueue<ExcelImportBase>();
+        public static ConcurrentQueue<Action> loadSheetTaskQ = new ConcurrentQueue<Action>();
+
         [STAThread]
         static int Main(string[] args)
         {
@@ -39,9 +44,38 @@ namespace ExcelDataImport
                 return -1;
             }
 
-            int retVal = 0;
+            int retVal = LoadAllExcelSheet(dirPathName);
 
             return retVal;
         }
+
+        #region Load all excel files
+        public static int LoadAllExcelSheet(string dirPathName)
+        {
+            // 모든 엑셀 시트 로드
+
+            return 0;
+        }
+
+        public static void LoadExcelSheetAsync<T>(string dirPath, string sheetName)
+        {
+            var act = new Action(() =>
+            {
+                bool load = LoadExcelSheet<T>(dirPath, sheetName, out var import);
+
+                if (load)
+                    excelSheetQ.Enqueue(import);
+            });
+
+            loadSheetTaskQ.Enqueue(act);
+        }
+
+        public static bool LoadExcelSheet<T>(string dirPath, string sheetName, out ExcelImportBase import)
+        {
+            import = Activator.CreateInstance(typeof(T)) as ExcelImportBase;
+
+            return true;
+        }
+        #endregion
     }
 }
