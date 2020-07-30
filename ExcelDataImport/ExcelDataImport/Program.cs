@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using System.IO;
 using ImportLib;
 using System.Collections.Concurrent;
+using System.Configuration;
 
 namespace ExcelDataImport
 {
@@ -56,6 +57,7 @@ namespace ExcelDataImport
                 else if (input == "1")
                 {
                     // import 추가
+                    ExecuteImport(dirPathName);
                     break;
                 }
             }
@@ -94,5 +96,36 @@ namespace ExcelDataImport
             return true;
         }
         #endregion
+        public static int ExecuteImport(string dirPathName)
+        {
+            AppSettingsReader settingsReader = new AppSettingsReader();
+            string connStr = settingsReader.GetValue("PostgreSQLConnectionString", typeof(string)) as string;
+
+            Console.WriteLine(connStr);
+
+            PostgreSql db = new PostgreSql(connStr);
+
+            Task[] tasks = new Task[8];
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = Task.Run(() =>
+                {
+                    PostgreSql taskdb = new PostgreSql(connStr);
+
+                    while (true)
+                    {
+                        if (!excelSheetQ.TryDequeue(out var import))
+                            return;
+
+                        // db로 카피 추가
+                    }
+                });
+            }
+
+            foreach (var task in tasks)
+                task.Wait();
+
+            return 0;
+        }
     }
 }
