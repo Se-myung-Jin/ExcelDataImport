@@ -46,6 +46,23 @@ namespace ExcelDataImport
 
             int retVal = LoadAllExcelSheet(dirPathName);
 
+            while (true)
+            {
+                Console.WriteLine("0 : 종료, 1 : 테이블 검사 후 임포트");
+                var input = Console.ReadLine();
+
+                if (input == "0")
+                    break;
+                else if (input == "1")
+                {
+                    // import 추가
+                    break;
+                }
+            }
+
+            Console.WriteLine("Press [Enter] to exit.");
+            Console.ReadLine();
+
             return retVal;
         }
 
