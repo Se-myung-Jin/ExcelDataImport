@@ -185,7 +185,19 @@ namespace ExcelDataImport
                 }
             }
 
-            // 변화 찾은 뒤 수정 작업 필요
+            var addedTable = new List<object[]>();
+            var missingTable = new List<object[]>();
+
+            if (!GetAllChanges(ref tableValues, ref dbValues, ref addedTable, ref missingTable))
+            {
+                Console.WriteLine($"{import.TableName} 테이블 데이터의 바뀐 내용이 없습니다.");
+                return true;
+            }
+            else
+            {
+                var modifiedTable = new List<object[]>();
+                // 수정 작업
+            }
 
             return true;
         }
@@ -215,5 +227,114 @@ namespace ExcelDataImport
             return true;
         }
 
+        public static bool GetAllChanges(ref List<object[]> tableValues, ref List<object[]> dbValues, ref List<object[]> addedTable, ref List<object[]> missingTable)
+        {
+            tableValues = tableValues.OrderBy((val) => val?[0]).ToList();
+            dbValues = dbValues.OrderBy((val) => val?[0]).ToList();
+
+            bool isChange = false;
+
+            for (int i = 0; i < tableValues.Count; i++)
+            {
+                object[] tableValue = tableValues[i];
+
+                if (tableValue == null)
+                    continue;
+
+                bool find = false;
+                int remove = -1;
+
+                int tableNumberValue = -1;
+
+                try
+                {
+                    tableNumberValue = Convert.ToInt32(tableValue[0]);
+                }
+                catch (Exception e)
+                {
+
+                }
+
+                for (int j = 0; j < dbValues.Count; j++)
+                {
+                    object[] dbValue = dbValues[j];
+
+                    if (dbValue == null)
+                        continue;
+
+                    int DBNumberValue = -1;
+
+                    try
+                    {
+                        DBNumberValue = Convert.ToInt32(dbValue[0]);
+                    }
+                    catch (Exception e)
+                    {
+
+                    }
+
+                    if (DBNumberValue > tableNumberValue)
+                    {
+                        find = false;
+
+                        break;
+                    }
+                    else if (DBNumberValue != tableNumberValue)
+                    {
+                        remove = j;
+                    }
+
+                    for (int k = 0; k < dbValue.Length; k++)
+                    {
+                        var tableValueString = tableValue[k]?.ToString() ?? "null";
+                        var dbValueString = dbValue[k]?.ToString() ?? "null";
+
+                        dbValueString = dbValueString == "" ? "null" : dbValueString;
+
+                        if (tableValueString != dbValueString)
+                        {
+                            find = false;
+                            break;
+                        }
+
+                        if (k == dbValue.Length - 1)
+                        {
+                            find = true;
+                        }
+                    }
+
+                    if (find)
+                    {
+                        dbValues.RemoveAt(j);
+                        break;
+                    }
+                }
+
+                if (!find)
+                {
+                    addedTable.Add(tableValue);
+
+                    isChange = true;
+                }
+
+                if (remove != -1)
+                {
+                    for (int k = 0; k < remove; k++)
+                    {
+                        var removeValue = dbValues[0];
+                        missingTable.Add(removeValue);
+                        dbValues.RemoveAt(0);
+                    }
+                }
+            }
+
+            foreach (var dbValue in dbValues)
+            {
+                missingTable.Add(dbValue);
+                isChange = true;
+            }
+
+            return isChange;
+        }
     }
 }
