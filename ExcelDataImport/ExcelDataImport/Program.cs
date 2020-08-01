@@ -149,5 +149,71 @@ namespace ExcelDataImport
 
             return error;
         }
+
+        public static bool TryCopyToDB(PostgreSql db, ExcelImportBase import)
+        {
+            var dbRows = new List<Dictionary<String, object>>();
+
+            if (!db.ExecuteQuery($"select * from {import.TableName};", ref dbRows))
+            {
+                Console.WriteLine($"DB query failed, {import.TableName}");
+                return false;
+            }
+
+            var dbValues = new List<object[]>();
+
+            if (!GetAllValues(dbRows, import.ColumnNames, ref dbValues))
+            {
+                Console.WriteLine($"Get db query failed, {import.TableName}");
+                return false;
+            }
+
+            var tableValues = new List<object[]>();
+
+            import.ResetId();
+            foreach (var row in import.GetRows())
+            {
+                try
+                {
+                    var tableValue = import.GetValues(row);
+                    tableValues.Add(tableValue);
+                }
+                catch (Exception e)
+                {
+                    errorMsgQ.Enqueue($"{import.FileName} 테이블에서 예외가 발생하였습니다.");
+                    return false;
+                }
+            }
+
+            // 변화 찾은 뒤 수정 작업 필요
+
+            return true;
+        }
+
+        public static bool GetAllValues(List<Dictionary<String, object>> Rows, string[] ColumnNames, ref List<object[]> allValues)
+        {
+            for (int i = 0; i < Rows.Count; i++)
+            {
+                var row = Rows[i];
+                object[] values = new object[ColumnNames.Length];
+
+                for (int  j = 0; j < ColumnNames.Length; j++)
+                {
+                    var columnName = ColumnNames[j];
+                    if (row.TryGetValue(columnName, out var value))
+                    {
+                        values[j] = value;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                allValues.Add(values);
+            }
+
+            return true;
+        }
+
     }
 }
