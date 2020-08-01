@@ -15,6 +15,7 @@ namespace ExcelDataImport
     {
         public static ConcurrentQueue<ExcelImportBase> excelSheetQ = new ConcurrentQueue<ExcelImportBase>();
         public static ConcurrentQueue<Action> loadSheetTaskQ = new ConcurrentQueue<Action>();
+        public static ConcurrentQueue<string> errorMsgQ = new ConcurrentQueue<string>();
 
         [STAThread]
         static int Main(string[] args)
@@ -96,6 +97,7 @@ namespace ExcelDataImport
             return true;
         }
         #endregion
+
         public static int ExecuteImport(string dirPathName)
         {
             AppSettingsReader settingsReader = new AppSettingsReader();
@@ -125,7 +127,27 @@ namespace ExcelDataImport
             foreach (var task in tasks)
                 task.Wait();
 
+            if (PrintErrorMsg())
+                return 1;
+
             return 0;
+        }
+
+        public static bool PrintErrorMsg()
+        {
+            bool error = errorMsgQ.Count > 0;
+            Console.ForegroundColor = ConsoleColor.Red;
+
+            while (true)
+            {
+                if (!errorMsgQ.TryDequeue(out var errorMsg))
+                    break;
+
+                Console.WriteLine(errorMsg);
+            }
+            Console.ResetColor();
+
+            return error;
         }
     }
 }
