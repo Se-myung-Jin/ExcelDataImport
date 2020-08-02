@@ -165,6 +165,13 @@ namespace ExcelDataImport
             if (PrintErrorMsg())
                 return 1;
 
+            while (true)
+            {
+                if (!changesQ.TryDequeue(out var changes))
+                    break;
+
+                ApplyChanges(db, changes);
+            }
             return 0;
         }
 
@@ -542,7 +549,72 @@ namespace ExcelDataImport
                 addedTable.Remove(removed);
             }
         }
+        #endregion
 
+        #region apply changes
+        private static bool ApplyChanges(PostgreSql db, Tuple<ExcelImportBase, List<object[]>, List<object[]>, List<object[]>> changes)
+        {
+            var import = changes.Item1;
+            var addedTable = changes.Item2;
+            var modifiedTable = changes.Item3;
+            var missingTable = changes.Item4;
+
+            int idIdx = 0;
+            idIdxDic.TryGetValue(import.FileName, out idIdx);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"{import.TableName} 테이블에 추가된 항목 수 : {addedTable.Count}");
+            foreach (object[] added in addedTable)
+            {
+                Console.WriteLine($"{import.TableName} 테이블에 추가된 항목의 id : {added[idIdx]}");
+            }
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"{import.TableName} 테이블에 수정된 항목 수 : {modifiedTable.Count}");
+            foreach (object[] modi in modifiedTable)
+            {
+                Console.WriteLine($"{import.TableName} 테이블에 수정된 항목의 id : {modi[idIdx]}");
+            }
+
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"{import.TableName} 테이블에 누락된 항목 수 : {missingTable.Count}");
+            foreach (object[] missing in missingTable)
+            {
+                Console.WriteLine($"{import.TableName} 테이블에 누락된 항목의 id : {missing[idIdx]}");
+            }
+
+            Console.ResetColor();
+
+            if (!DecideApply(import.TableName))
+                return false;
+
+            if (!db.ImportFrom(import))
+            {
+                Console.WriteLine($"DB Insert Fail!!, {import.TableName}");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool DecideApply(string tableName)
+        {
+            while (true)
+            {
+                Console.WriteLine($"{tableName} 테이블에 변경된 내용을 적용하시겠습니까? [ y / n ]");
+
+                var input = Console.ReadLine().ToLower();
+
+                if (input == "y")
+                    return true;
+
+                else if (input == "n")
+                    return false;
+
+                else
+                    continue;
+            }
+        }
         #endregion
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Npgsql;
+using ImportLib;
 
 namespace ExcelDataImport
 {
@@ -108,5 +109,63 @@ namespace ExcelDataImport
             return true;
         }
         #endregion
+
+        public bool ImportFrom(ExcelImportBase import)
+        {
+            string columNames = import.ColumnNames.Aggregate(new StringBuilder(),
+                (current, next) => current.Append(current.Length == 0 ? "" : ",").Append(next)).ToString();
+
+            using (var trx = conn.BeginTransaction())
+            {
+                int rowCount = 0;
+                try
+                {
+                    var truncateCmd = conn.CreateCommand();
+                    truncateCmd.CommandText = $"DELETE FROM {import.TableName}";
+                    truncateCmd.ExecuteNonQuery();
+
+                    var query = $"COPY {import.TableName} ({columNames}) FROM STDIN (FORMAT BINARY)";
+
+                    using (var writer = conn.BeginBinaryImport($"COPY {import.TableName} ({columNames}) FROM STDIN (FORMAT BINARY)"))
+                    {
+                        rowCount = 1;
+                        import.ResetId();
+                        foreach (var r in import.GetRows())
+                        {
+                            rowCount++;
+                            var result = import.GetValues(r);
+                            if (result == null)
+                                continue;
+
+                            writer.WriteRow(result);
+                        }
+
+                        writer.Complete();
+                    }
+                }
+                catch (PostgresException e)
+                {
+                    trx.Rollback();
+                    Console.WriteLine($"Excel Name: {import.eName}");
+                    Console.WriteLine($"Row: {rowCount}");
+                    Console.WriteLine($"Msg: {e.Message}");
+                    Console.WriteLine($"Detail: {e.Detail}");
+                    return false;
+                }
+                catch (Exception e)
+                {
+                    trx.Rollback();
+                    Console.WriteLine($"Excel Name: {import.eName}");
+                    Console.WriteLine($"Row: {rowCount}");
+                    Console.WriteLine($"Msg: {e.Message}");
+                    return false;
+                }
+
+                trx.Commit();
+            }
+
+            Console.WriteLine($"{import.TableName} 완료");
+            return true;
+        }
     }
 }
