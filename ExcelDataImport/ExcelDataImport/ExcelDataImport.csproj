@@ -83,6 +83,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ImportClasses\BooksClass.cs" />
     <Compile Include="ImportClasses\EmployeesClass.cs" />
     <Compile Include="ImportLib\ExcelImportBase.cs" />
     <Compile Include="ImportLib\ExcelSheetLoader.cs" />

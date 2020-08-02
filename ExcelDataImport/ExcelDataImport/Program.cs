@@ -77,8 +77,10 @@ namespace ExcelDataImport
         public static int LoadAllExcelSheet(string dirPathName)
         {
             LoadExcelSheetAsync<EmployeesClass>(dirPathName, "Employees");
+            LoadExcelSheetAsync<BooksClass>(dirPathName, "Books");
 
             idTypeDic.Add("Employees", PostgreSql.eIdType.Generate);
+            idTypeDic.Add("Books", PostgreSql.eIdType.Generate);
 
             Task[] tasks = new Task[8];
             for (int i = 0; i < tasks.Length; i++)

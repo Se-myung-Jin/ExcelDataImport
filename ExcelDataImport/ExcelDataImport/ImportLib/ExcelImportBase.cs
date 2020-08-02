@@ -11,6 +11,7 @@ namespace ImportLib
     public enum ExcelName
     {
         Employees,
+        Books,
     }
 
     public abstract class ExcelImportBase
