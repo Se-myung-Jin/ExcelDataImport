@@ -22,6 +22,7 @@ namespace ImportLib
         public IEnumerable<RowRetType> GetRows() => Rows;
         public ExcelName eName { get; protected set; }
         string[] replaceStrings = { "{ }", "{}" };
+        protected ExcelSheetLoader Loader;
 
         protected int id = 0;
 
@@ -87,6 +88,31 @@ namespace ImportLib
                 throw new System.Exception("In Col[" + key + "] this keyword[" + value + "] is invalid.");
             }
             return dic_value;
+        }
+
+        private void LoadSheetLoader(string filePath)
+        {
+            Loader = new ExcelSheetLoader(filePath, EnumColumnFormat.NONE);
+        }
+
+        public void LoadSheetLoader(string folderPath, string sheetName)
+        {
+            FileName = sheetName;
+            string filePath = $"{folderPath}\\{sheetName}.xlsx";
+            LoadSheetLoader(filePath);
+        }
+
+        public bool Import()
+        {
+            if (!Loader.LoadSheet(ref Rows))
+            {
+                Console.WriteLine("{0}", Loader.ErrMsg);
+                Console.WriteLine("엑셀 파일 불러오기 실패했습니다. [Enter] 키를 눌러주세요.");
+                Console.ReadKey();
+                return false;
+            }
+
+            return true;
         }
 
         public virtual void ResetId()

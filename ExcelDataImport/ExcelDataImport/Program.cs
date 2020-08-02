@@ -118,6 +118,17 @@ namespace ExcelDataImport
         {
             import = Activator.CreateInstance(typeof(T)) as ExcelImportBase;
 
+            import.LoadSheetLoader(dirPath, sheetName);
+
+            if (!import.Import())
+            {
+                Console.WriteLine($"Excel import failed, {import.TableName}");
+                return false;
+            }
+            else
+            {
+                Console.WriteLine("{0}.xlsx 파일을 성공적으로 로딩했습니다.", sheetName);
+            }
             return true;
         }
         #endregion
