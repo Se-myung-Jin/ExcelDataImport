@@ -9,6 +9,13 @@ namespace ExcelDataImport
 {
     class PostgreSql
     {
+        public enum eIdType : sbyte
+        {
+            Default     = 0, // 기본 테이블
+            Generate    = 1, // id가 1씩 증가하는 테이블
+            Overlap     = 2, // id가 중복인 테이블
+        }
+
         private NpgsqlConnection conn = null;
 
         public PostgreSql(string connectionStringRw)

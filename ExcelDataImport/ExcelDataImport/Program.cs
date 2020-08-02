@@ -16,6 +16,10 @@ namespace ExcelDataImport
         public static ConcurrentQueue<ExcelImportBase> excelSheetQ = new ConcurrentQueue<ExcelImportBase>();
         public static ConcurrentQueue<Action> loadSheetTaskQ = new ConcurrentQueue<Action>();
         public static ConcurrentQueue<string> errorMsgQ = new ConcurrentQueue<string>();
+        public static ConcurrentQueue<Tuple<ExcelImportBase, List<object[]>, List<object[]>, List<object[]>>> changesQ = new ConcurrentQueue<Tuple<ExcelImportBase, List<object[]>, List<object[]>, List<object[]>>>();
+
+        static Dictionary<string, PostgreSql.eIdType> idTypeDic = new Dictionary<string, PostgreSql.eIdType>();
+        static Dictionary<string, int> idIdxDic = new Dictionary<string, int>();
 
         [STAThread]
         static int Main(string[] args)
@@ -57,7 +61,6 @@ namespace ExcelDataImport
                     break;
                 else if (input == "1")
                 {
-                    // import 추가
                     ExecuteImport(dirPathName);
                     break;
                 }
@@ -119,7 +122,7 @@ namespace ExcelDataImport
                         if (!excelSheetQ.TryDequeue(out var import))
                             return;
 
-                        // db로 카피 추가
+                        TryCopyToDB(taskdb, import);
                     }
                 });
             }
@@ -196,10 +199,12 @@ namespace ExcelDataImport
             else
             {
                 var modifiedTable = new List<object[]>();
-                // 수정 작업
+                GetModifiedTable(ref addedTable, ref modifiedTable, ref missingTable, import.FileName);
+                var changes = new Tuple<ExcelImportBase, List<object[]>, List<object[]>, List<object[]>>(import, addedTable, modifiedTable, missingTable);
+                changesQ.Enqueue(changes);
+                Console.WriteLine($"{import.TableName} 테이블의 수정 사항이 생겼습니다.");
+                return true;
             }
-
-            return true;
         }
 
         public static bool GetAllValues(List<Dictionary<String, object>> Rows, string[] ColumnNames, ref List<object[]> allValues)
@@ -336,5 +341,176 @@ namespace ExcelDataImport
 
             return isChange;
         }
+
+        #region Modifiy Table
+        public static void GetModifiedTable(ref List<object[]> addedTable, ref List<object[]> modifiedTable, ref List<object[]> missingTable, string fileName)
+        {
+            var type = PostgreSql.eIdType.Default;
+            int idIdx = 0;
+
+            idTypeDic.TryGetValue(fileName, out type);
+            idIdxDic.TryGetValue(fileName, out idIdx);
+
+            try
+            {
+                switch (type)
+                {
+                    case PostgreSql.eIdType.Default:
+                        GetModifiedTableDefault(ref addedTable, ref modifiedTable, ref missingTable, idIdx);
+                        break;
+                    case PostgreSql.eIdType.Generate:
+                        GetModifiedTableGenerate(ref addedTable, ref modifiedTable, ref missingTable);
+                        break;
+                    case PostgreSql.eIdType.Overlap:
+                        GetModifiedTableOverlap(ref addedTable, ref modifiedTable, ref missingTable);
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                errorMsgQ.Enqueue($"{fileName} 테이블에서 예외가 발생하였습니다.");
+
+            }
+        }
+
+        private static void GetModifiedTableDefault(ref List<object[]> addedTable, ref List<object[]> modifiedTable, ref List<object[]> missingTable, int idIdx)
+        {
+            var addedDic = addedTable.ToDictionary(val => val[idIdx].ToString());
+
+            foreach (var missing in missingTable)
+            {
+                var key = missing[idIdx].ToString();
+
+                if (addedDic.TryGetValue(key, out var objectArr))
+                {
+                    modifiedTable.Add(objectArr);
+                }
+            }
+
+            foreach (var modi in modifiedTable)
+            {
+                missingTable.RemoveAll(val => val[idIdx].ToString() == modi[idIdx].ToString());
+                addedTable.Remove(modi);
+            }
+        }
+
+        private static void GetModifiedTableGenerate(ref List<object[]> addedTable, ref List<object[]> modifiedTable, ref List<object[]> missingTable)
+        {
+            var addedList = new List<object[]>();
+            var missingList = new List<object[]>();
+
+            addedTable = addedTable.OrderBy(val => val[1]).ToList();
+            missingTable = missingTable.OrderBy(val => val[1]).ToList();
+
+            foreach (var added in addedTable)
+            {
+                bool find = true;
+
+                int count = 0;
+
+                int addedNumberValue = -1;
+
+                try
+                {
+                    addedNumberValue = Convert.ToInt32(added[1]);
+                }
+                catch (Exception e)
+                {
+
+                }
+
+                foreach (var missing in missingTable)
+                {
+                    find = true;
+
+                    count++;
+
+                    int missingNumberValue = -1;
+
+                    try
+                    {
+                        missingNumberValue = Convert.ToInt32(missing[1]);
+                    }
+                    catch (Exception e)
+                    {
+
+                    }
+
+                    if (missingNumberValue > addedNumberValue)
+                    {
+                        find = false;
+                        break;
+                    }
+
+                    for (int k = 1; k < added.Length; k++)
+                    {
+                        if (added[k].ToString() != missing[k].ToString())
+                        {
+                            find = false;
+                            break;
+                        }
+                    }
+
+                    if (find)
+                    {
+                        addedList.Add(added);
+                        missingList.Add(missing);
+                        missingTable.RemoveAt(count - 1);
+                        break;
+                    }
+                }
+            }
+
+            foreach (var added in addedList)
+            {
+                addedTable.Remove(added);
+            }
+
+            foreach (var missing in missingList)
+            {
+                missingTable.Remove(missing);
+            }
+
+            addedList.Clear();
+            missingList.Clear();
+
+            GetModifiedTableOverlap(ref addedTable, ref modifiedTable, ref missingTable);
+        }
+
+        private static void GetModifiedTableOverlap(ref List<object[]> addedTable, ref List<object[]> modifiedTable, ref List<object[]> missingTable)
+        {
+            var removeAddedList = new List<object[]>();
+
+            foreach(var added in addedTable)
+            {
+                foreach(var missing in missingTable)
+                {
+                    int count = 0;
+
+                    for (int k = 1; k < added.Length; k++)
+                    {
+                        if (added[k].ToString() == missing[k].ToString())
+                        {
+                            count++;
+                        }
+                    }
+
+                    if (count > added.Length * 0.5f)
+                    {
+                        modifiedTable.Add(added);
+                        removeAddedList.Add(added);
+                        missingTable.Remove(missing);
+                        break;
+                    }
+                }
+            }
+
+            foreach (var removed in removeAddedList)
+            {
+                addedTable.Remove(removed);
+            }
+        }
+
+        #endregion
     }
 }
