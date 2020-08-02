@@ -58,6 +58,8 @@ namespace ImportLib
             {
                 using (var package = new OfficeOpenXml.ExcelPackage(new System.IO.FileInfo(FileName)))
                 {
+                    OfficeOpenXml.ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+
                     var workSheet = package.Workbook.Worksheets.FirstOrDefault();
 
                     if (workSheet == null)
