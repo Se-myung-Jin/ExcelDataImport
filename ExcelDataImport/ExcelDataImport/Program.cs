@@ -8,6 +8,7 @@ using System.IO;
 using ImportLib;
 using System.Collections.Concurrent;
 using System.Configuration;
+using ImportClasses;
 
 namespace ExcelDataImport
 {
@@ -75,7 +76,27 @@ namespace ExcelDataImport
         #region Load all excel files
         public static int LoadAllExcelSheet(string dirPathName)
         {
-            // 모든 엑셀 시트 로드
+            LoadExcelSheetAsync<EmployeesClass>(dirPathName, "Employees");
+
+            idTypeDic.Add("Employees", PostgreSql.eIdType.Generate);
+
+            Task[] tasks = new Task[8];
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = Task.Run(() =>
+                {
+                    while (true)
+                    {
+                        if (!loadSheetTaskQ.TryDequeue(out var action))
+                            return;
+
+                        action.Invoke();
+                    }
+                });
+            }
+
+            foreach (var task in tasks)
+                task.Wait();
 
             return 0;
         }
