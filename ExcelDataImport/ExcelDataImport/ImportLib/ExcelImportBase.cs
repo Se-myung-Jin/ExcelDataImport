@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using RowsRetType = System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, string>>;
 using RowRetType = System.Collections.Generic.Dictionary<string, string>;
+using System.ComponentModel;
 
 namespace ImportLib
 {
@@ -64,7 +65,7 @@ namespace ImportLib
 
             try
             {
-                return (T)Convert.ChangeType(value, typeof(T));
+                return (T)TypeDescriptor.GetConverter(typeof(T)).ConvertFromString(value);
             }
             catch (Exception)
             {
